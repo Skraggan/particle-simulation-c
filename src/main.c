@@ -18,11 +18,9 @@ FC_Font *font = NULL;
 
 struct particle
 {
-    float x;
-    float y;
-    float vx;
-    float vy;
-    float radius;
+    double position[2];
+    double velocity[2];
+    double radius;
 } particle;
 
 int initialize(void)
@@ -69,7 +67,7 @@ int initialize(void)
     return TRUE;
 }
 
-int setup()
+void setup()
 {
     font = FC_CreateFont();
     FC_LoadFont(font, renderer, "assets/fonts/ARIAL.ttf", 14, FC_MakeColor(255, 255, 255, 255), TTF_STYLE_NORMAL);
@@ -77,8 +75,10 @@ int setup()
     SDL_Surface *icon = IMG_Load("assets/images/icon32.png");
     SDL_SetWindowIcon(window, icon);
 
-    particle.x = 200;
-    particle.y = 200;
+    particle.position[0] = WINDOW_WIDTH / 2;
+    particle.position[1] = WINDOW_HEIGHT / 2;
+    particle.velocity[0] = 500;
+    particle.velocity[1] = -1500;
     particle.radius = 100;
 }
 
@@ -101,7 +101,7 @@ void process_input()
 
 void drawParticle(struct particle *particle)
 {
-    SDL_Color white = {255, 255, 255, 255};
+    // SDL_Color white = {255, 255, 255, 255};
     SDL_Color red = {255, 0, 0, 255};
     SDL_Color light_red = {255, 70, 70, 255};
     SDL_Color blue = {0, 0, 255, 255};
@@ -112,13 +112,13 @@ void drawParticle(struct particle *particle)
     SDL_Vertex vertices[vertices_len];
 
     // Center vertex
-    vertices[0].position.x = particle->x;
-    vertices[0].position.y = particle->y;
+    vertices[0].position.x = particle->position[0];
+    vertices[0].position.y = particle->position[1];
     vertices[0].color = red;
 
     // Initial second vertex (straight right)
-    vertices[2].position.x = particle->x;
-    vertices[2].position.y = particle->y + particle->radius;
+    vertices[2].position.x = particle->position[0];
+    vertices[2].position.y = particle->position[1] + particle->radius;
     vertices[2].color = blue;
 
     for (int i = 1; i <= CIRCLE_RESOLUTION; i++)
@@ -130,8 +130,8 @@ void drawParticle(struct particle *particle)
         vertices[1].color = light_red;
 
         // Second vertex
-        vertices[2].position.x = particle->x + (particle->radius * sin(((2 * pi) / CIRCLE_RESOLUTION) * i));
-        vertices[2].position.y = particle->y + (particle->radius * cos(((2 * pi) / CIRCLE_RESOLUTION) * i));
+        vertices[2].position.x = particle->position[0] + (particle->radius * sin(((2 * pi) / CIRCLE_RESOLUTION) * i));
+        vertices[2].position.y = particle->position[1] + (particle->radius * cos(((2 * pi) / CIRCLE_RESOLUTION) * i));
         vertices[2].color = light_red;
 
         // Render Circle
@@ -139,34 +139,72 @@ void drawParticle(struct particle *particle)
     }
 }
 
-int update()
+void handleCollision(struct particle *particle, double *delta_time)
+{
+    // Top border
+    if (particle->position[1] - particle->radius < 0)
+    {
+        particle->position[1] -= particle->velocity[1] * *delta_time;
+        particle->velocity[1] = particle->velocity[1] * ABSORPTION_FACTOR;
+        particle->velocity[0] = particle->velocity[0] * ABSORPTION_FACTOR;
+        particle->velocity[1] = particle->velocity[1] * -1;
+    }
+
+    // Bottom border
+    if (particle->position[1] + particle->radius > WINDOW_HEIGHT)
+    {
+        particle->position[1] -= particle->velocity[1] * *delta_time;
+        particle->velocity[1] = particle->velocity[1] * ABSORPTION_FACTOR;
+        particle->velocity[0] = particle->velocity[0] * ABSORPTION_FACTOR;
+        particle->velocity[1] = particle->velocity[1] * -1;
+    }
+
+    // Left border
+    if (particle->position[0] - particle->radius < 0)
+    {
+        particle->position[0] -= particle->velocity[0] * *delta_time;
+        particle->velocity[0] = particle->velocity[0] * ABSORPTION_FACTOR;
+        particle->velocity[1] = particle->velocity[1] * ABSORPTION_FACTOR;
+        particle->velocity[0] = particle->velocity[0] * -1;
+    }
+
+    // Right border
+    if (particle->position[0] + particle->radius > WINDOW_WIDTH)
+    {
+        particle->position[0] -= particle->velocity[0] * *delta_time;
+        particle->velocity[0] = particle->velocity[0] * ABSORPTION_FACTOR;
+        particle->velocity[1] = particle->velocity[1] * ABSORPTION_FACTOR;
+        particle->velocity[0] = particle->velocity[0] * -1;
+    }
+}
+
+void update()
 {
     // Update time variables
     struct timespec current_time;
     timespec_get(&current_time, TIME_UTC);
-    long double delta_time = (current_time.tv_sec - last_frame_time.tv_sec) + ((current_time.tv_nsec - last_frame_time.tv_nsec) / 1000000000.0);
+    double delta_time = (current_time.tv_sec - last_frame_time.tv_sec) + ((current_time.tv_nsec - last_frame_time.tv_nsec) / 1000000000.0);
     last_frame_time = current_time;
     current_fps = (int)1 / delta_time;
 
     // SDL_Delay(200);
 
-    particle.x += 70 * delta_time;
-    particle.y += 30 * delta_time;
+    // Update position and velocity
+    particle.position[0] += particle.velocity[0] * delta_time;
+    particle.position[1] += particle.velocity[1] * delta_time;
+    particle.velocity[1] += ACCELERATION * delta_time;
+
+    handleCollision(&particle, &delta_time);
+
+    // printf("delta time: %lf, multiplication:%lf\n", delta_time, 70 * delta_time);
+    // printf("X: %lf, Y: %lf\n", particle.position[0], particle.position[1]);
 }
 
-int render()
+void render()
 {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    SDL_Rect particle_rect = {
-        (int)particle.x,
-        (int)particle.y,
-        (int)particle.radius,
-        (int)particle.radius};
-
-    // SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    // SDL_RenderFillRect(renderer, &particle_rect);
     drawParticle(&particle);
 
     // Render FPS counter
