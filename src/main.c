@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_main.h>
+#include <SDL2/SDL_image.h>
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
@@ -73,6 +74,9 @@ int setup()
     font = FC_CreateFont();
     FC_LoadFont(font, renderer, "assets/fonts/ARIAL.ttf", 14, FC_MakeColor(255, 255, 255, 255), TTF_STYLE_NORMAL);
 
+    SDL_Surface *icon = IMG_Load("assets/images/icon32.png");
+    SDL_SetWindowIcon(window, icon);
+
     particle.x = 200;
     particle.y = 200;
     particle.radius = 100;
@@ -98,6 +102,9 @@ void process_input()
 void drawParticle(struct particle *particle)
 {
     SDL_Color white = {255, 255, 255, 255};
+    SDL_Color red = {255, 0, 0, 255};
+    SDL_Color light_red = {255, 70, 70, 255};
+    SDL_Color blue = {0, 0, 255, 255};
 
     const double pi = acos(-1);
 
@@ -107,12 +114,12 @@ void drawParticle(struct particle *particle)
     // Center vertex
     vertices[0].position.x = particle->x;
     vertices[0].position.y = particle->y;
-    vertices[0].color = white;
+    vertices[0].color = red;
 
     // Initial second vertex (straight right)
     vertices[2].position.x = particle->x;
     vertices[2].position.y = particle->y + particle->radius;
-    vertices[2].color = white;
+    vertices[2].color = blue;
 
     for (int i = 1; i <= CIRCLE_RESOLUTION; i++)
     {
@@ -120,12 +127,12 @@ void drawParticle(struct particle *particle)
         // First vertex (equal to last iteration's second vertex)
         vertices[1].position.x = vertices[2].position.x;
         vertices[1].position.y = vertices[2].position.y;
-        vertices[1].color = white;
+        vertices[1].color = light_red;
 
         // Second vertex
         vertices[2].position.x = particle->x + (particle->radius * sin(((2 * pi) / CIRCLE_RESOLUTION) * i));
         vertices[2].position.y = particle->y + (particle->radius * cos(((2 * pi) / CIRCLE_RESOLUTION) * i));
-        vertices[2].color = white;
+        vertices[2].color = light_red;
 
         // Render Circle
         SDL_RenderGeometry(renderer, 0, vertices, vertices_len, NULL, 0);
